@@ -10,8 +10,11 @@ generate_ssh_key() {
     SSH_KEY_PATH="$SSH_DIR/$SSH_KEY_FILENAME"
 
     if [[ -f "$SSH_KEY_PATH" ]]; then
-        echo "Error: A file already exists at $SSH_KEY_PATH. Please choose a different name."
-        exit 1
+        read -p "Warning: Existing file at $SSH_KEY_PATH will be overwritten this will also generate a new authorized_keys file you need to put on the server. Continue? (y/n): " confirm
+        if [[ $confirm != "y" ]]; then
+            echo "Operation aborted."
+            exit 1
+        fi
     fi
 
     echo "Generating the SSH key pair..."
@@ -33,14 +36,21 @@ select_partition() {
     fi
 }
 
-# Function to write the SSH public key to the specified partition
-write_key_to_partition() {
+# Function to write the SSH public key and the SSH configuration script to the specified partition
+write_key_and_script_to_partition() {
+    SSH_CONFIG_SCRIPT="./server/configure-sshd.sh"
+    if [[ ! -f "$SSH_CONFIG_SCRIPT" ]]; then
+        echo "Error: SSH configuration script not found at $SSH_CONFIG_SCRIPT."
+        exit 1
+    fi
+
     MOUNT_POINT="/mnt/usb_ssh"
     sudo mkdir -p "$MOUNT_POINT"
     sudo mount "$PARTITION" "$MOUNT_POINT"
 
     sudo cp "$PUB_KEY_PATH" "$MOUNT_POINT/authorized_keys"
-    echo "SSH public key has been copied to $PARTITION."
+    sudo cp "$SSH_CONFIG_SCRIPT" "$MOUNT_POINT/configure-sshd.sh"
+    echo "SSH public key and configuration script have been copied to $PARTITION."
 
     sudo umount "$MOUNT_POINT"
 }
@@ -49,8 +59,8 @@ write_key_to_partition() {
 main() {
     generate_ssh_key
     select_partition
-    write_key_to_partition
-    echo "SSH key generation and placement on partition completed."
+    write_key_and_script_to_partition
+    echo "SSH key generation and script placement on partition completed."
 }
 
 main
